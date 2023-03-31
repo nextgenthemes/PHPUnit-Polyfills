@@ -21,58 +21,25 @@ jobs:
     strategy:
       matrix:
         php: ['5.6', '7.0', '7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2']
-        phpunit: ['auto']
+        dependencies: ['highest', 'lowest']
         experimental: [false]
 
         include:
-          # Test against a version on the low-end of the PHPUnit versions supported for each PHP version.
-          # Using the Composer `--prefer-lowest` option is, unfortunately, not viable, as
-          # PHPUnit 4.8.36 doesn't have proper PHP restrictions, which means that it
-          # would always be installed as "low", which would break the builds for PHP 7.2+.
-          - php: '5.6'
-            phpunit: '5.7.21'
-            experimental: false
-          - php: '7.0'
-            phpunit: '5.7.27'
-            experimental: false
-          - php: '7.1'
-            phpunit: '5.7.21'
-            experimental: false
-          - php: '7.2'
-            phpunit: '6.3.1'
-            experimental: false
-          - php: '7.3'
-            phpunit: '7.2.7'
-            experimental: false
-          - php: '7.4'
-            phpunit: '8.1.6'
-            experimental: false
-          - php: '8.0'
-            phpunit: '8.5.16'
-            experimental: false
-          - php: '8.0'
-            phpunit: '9.3.0'
-            experimental: false
-          - php: '8.1'
-            phpunit: '9.3.0'
-            experimental: false
-          - php: '8.2'
-            phpunit: '9.3.0'
-            experimental: false
-
           # Experimental builds.
           - php: '8.3'
-            phpunit: 'auto' # PHPUnit 9.x.
+            dependencies: 'highest'
             experimental: true
 
           - php: '8.1'
+            dependencies: 'highest'
             phpunit: '^10.0'
             experimental: true
           - php: '8.2'
+            dependencies: 'highest'
             phpunit: '^10.0'
             experimental: true
 
-    name: "Tests: PHP ${{ matrix.php }} - PHPUnit: ${{matrix.phpunit}}"
+    name: "Tests: PHP ${{ matrix.php }} - PHPUnit: ${{ matrix.phpunit && matrix.phpunit || matrix.dependencies }}"
 
     continue-on-error: ${{ matrix.experimental }}
 
@@ -88,22 +55,24 @@ jobs:
           coverage: none
 
       - name: 'Composer: set PHPUnit version for tests'
-        if: ${{ matrix.phpunit != 'auto' }}
+        if: ${{ matrix.phpunit }}
         run: composer require --no-update phpunit/phpunit:"${{ matrix.phpunit }}" --no-interaction
 
       # Install dependencies and handle caching in one go.
       # @link https://github.com/marketplace/actions/install-composer-dependencies
       - name: Install Composer dependencies - normal
-        if: matrix.php != '8.3'
+        if: ${{ matrix.php != '8.3' }}
         uses: "ramsey/composer-install@v2"
         with:
+          dependency-versions: ${{ matrix.dependencies }}
           # Bust the cache at least once a month - output format: YYYY-MM.
           custom-cache-suffix: $(date -u "+%Y-%m")
 
       - name: Install Composer dependencies - ignore PHP restrictions
-        if: matrix.php == '8.3'
+        if: ${{ matrix.php == '8.3' }}
         uses: "ramsey/composer-install@v2"
         with:
+          dependency-versions: ${{ matrix.dependencies }}
           composer-options: --ignore-platform-req=php+
           # Bust the cache at least once a month - output format: YYYY-MM.
           custom-cache-suffix: $(date -u "+%Y-%m")
